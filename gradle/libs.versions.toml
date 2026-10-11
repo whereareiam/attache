@@ -13,7 +13,7 @@ junit = "6.0.0"
 # platforms apis
 bungee = "26.1-R0.1-SNAPSHOT"
 bukkit = "26.1.2-R0.1-SNAPSHOT"
-paper = "26.1.2.build.63-stable"
+paper = "26.2.build.132-stable"
 velocity = "3.4.0-SNAPSHOT"
 
 # platforms apis -> spring
