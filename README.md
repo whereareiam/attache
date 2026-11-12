@@ -379,6 +379,50 @@ Library library = Library.builder()
 		.build();
 ```
 
+#### Library Transformers
+
+A `LibraryTransformer` changes a library jar after Attache downloaded and relocated it and before it is loaded,
+for example to rewrite its bytecode for an older Java runtime. Attache does not know what a transformer does; it
+runs the registered transformers in order and keeps their results in the save directory:
+
+```java
+libraryManager.registerLibraryTransformer(new LibraryTransformer() {
+	@Override
+	public @NotNull String getId() {
+		return "downgrade";
+	}
+
+	@Override
+	public @NotNull String getVersion() {
+		return "1";
+	}
+
+	@Override
+	public boolean appliesTo(@NotNull LibraryRequest library) {
+		return !library.getGroupId().equals("me.example.tools");
+	}
+
+	@Override
+	public @NotNull Path transform(@NotNull LibraryRequest library, @NotNull Path input, @NotNull Path output) throws IOException {
+		if (!needsChange(input)) return input;
+
+		rewrite(input, output);
+		return output;
+	}
+});
+libraryManager.loadDescriptors();
+```
+
+- A transformer writes the changed jar to `output` and returns it, or returns `input` when the jar needs no change.
+- The transformed jar lies beside the downloaded one, named after the transformer's identifier and version. It is
+  reused while the jar it was made from is unchanged, so a restart transforms nothing again; change the version
+  whenever the transformer writes different bytes, and the libraries are transformed anew.
+- Transformers apply to every library the manager downloads, isolated ones and the libraries Attache loads for
+  itself, such as its relocator and resolver, so register them before loading libraries. A transformer that loads
+  its own libraries through the same manager leaves them out in `appliesTo`.
+- `loadLibrary(library, file)` loads the given file as it is.
+- `getLibraryTransformers()` lists the registered transformers in order, so another manager can register the same ones.
+
 ## Credits
 
 **Attache is based on [Libby](https://github.com/AlessioDP/libby) and [Libby Maven Resolver](https://github.com/AlessioDP/libby-maven-resolver)** by AlessioDP and Byteflux.

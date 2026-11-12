@@ -1,7 +1,7 @@
 ---
-version: 1.3.0
+version: 1.4.0
 ---
 
-# Attache 1.3.0 - Own descriptors
+# Attache 1.4.0 - Library transformers
 
-`LibraryManager#setDescriptorSources` names the jars or directories a library manager reads descriptors from. A part of an application with a class loader of its own, such as an add-on loaded in a child class loader, gives its manager its own jar, so it loads only the libraries it declares instead of reading the application's descriptors and loading those libraries again. By default a manager reads descriptors as before.
+`LibraryManager#registerLibraryTransformer` lets an application change every library jar after Attache downloaded and relocated it and before it is loaded, for example to rewrite its bytecode for an older Java runtime. Attache keeps the transformed jars in its save directory, keyed by the transformer's identifier and version, so a restart reuses them and a new transformer version transforms them again.

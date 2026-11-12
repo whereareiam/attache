@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.net.URL;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * A runtime dependency manager for java applications.
@@ -53,6 +54,47 @@ public interface LibraryManager {
 	 * @return true if an adapter is registered
 	 */
 	boolean hasLibraryAdapter(@NotNull Class<?> type);
+
+	/**
+	 * Registers a transformer that changes library jars after they are downloaded and relocated.
+	 * <p>
+	 * Transformers run in the order they were registered, on every library downloaded afterwards; register
+	 * them before loading libraries. A transformer with the identifier of a registered one replaces it in
+	 * its place. {@link #loadLibrary(Object, Path)} loads the given file as it is.
+	 *
+	 * @param transformer the transformer
+	 * @see LibraryTransformer
+	 */
+	void registerLibraryTransformer(@NotNull LibraryTransformer transformer);
+
+	/**
+	 * Removes a registered library transformer.
+	 *
+	 * @param id the identifier of the transformer
+	 */
+	void unregisterLibraryTransformer(@NotNull String id);
+
+	/**
+	 * Checks whether a library transformer with the given identifier is registered.
+	 *
+	 * @param id the identifier of the transformer
+	 * @return true if a transformer is registered under the identifier
+	 */
+	boolean hasLibraryTransformer(@NotNull String id);
+
+	/**
+	 * Gets the registered library transformers in the order they run.
+	 * <p>
+	 * A manager that should transform its libraries like this one, such as the manager of a part of an
+	 * application, registers the same transformers:
+	 * <pre>{@code
+	 * libraryManager.getLibraryTransformers().forEach(partLibraries::registerLibraryTransformer);
+	 * }</pre>
+	 *
+	 * @return an unmodifiable snapshot of the registered transformers
+	 */
+	@NotNull
+	List<LibraryTransformer> getLibraryTransformers();
 
 	/**
 	 * Gets the configured log adapter.
@@ -129,6 +171,9 @@ public interface LibraryManager {
 
 	/**
 	 * Downloads a library jar and caches it in the save directory if it doesn't already exist.
+	 * <p>
+	 * The returned jar has the library's relocations applied and has passed through the registered
+	 * {@link LibraryTransformer}s.
 	 *
 	 * @param library the library model to download
 	 * @return the path to the downloaded library jar
