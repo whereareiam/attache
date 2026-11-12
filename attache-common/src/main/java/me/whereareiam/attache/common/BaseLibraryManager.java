@@ -3,6 +3,7 @@ package me.whereareiam.attache.common;
 import me.whereareiam.attache.LibraryAdapter;
 import me.whereareiam.attache.LibraryBatchLoader;
 import me.whereareiam.attache.LibraryManager;
+import me.whereareiam.attache.LibraryTransformer;
 import me.whereareiam.attache.LoggingHelper;
 import me.whereareiam.attache.Repositories;
 import me.whereareiam.attache.common.classloader.IsolatedClassLoader;
@@ -114,6 +115,7 @@ public abstract class BaseLibraryManager implements LibraryManager, AutoCloseabl
 
 	private final ArtifactDownloadCoordinator artifactDownloadCoordinator;
 	private final RelocationCoordinator relocationCoordinator;
+	private final TransformationCoordinator transformationCoordinator;
 	private final LibraryBatchLoader libraryBatchLoader;
 	private final LibraryLoadMode libraryLoadMode;
 	private final ClasspathDescriptorLoader classpathDescriptorLoader = new ClasspathDescriptorLoader();
@@ -161,6 +163,7 @@ public abstract class BaseLibraryManager implements LibraryManager, AutoCloseabl
 		this.logger = new Logger(loggingHelper);
 		this.artifactDownloadCoordinator = new ArtifactDownloadCoordinator(this, this.saveDirectory);
 		this.relocationCoordinator = new RelocationCoordinator(this, this.saveDirectory);
+		this.transformationCoordinator = new TransformationCoordinator(this, this.saveDirectory);
 		this.libraryLoadMode = resolveLibraryLoadMode();
 		this.libraryBatchLoader = createLibraryBatchLoader(this.libraryLoadMode);
 		registerLibraryAdapter(LibraryRequest.class, request -> request);
@@ -240,6 +243,27 @@ public abstract class BaseLibraryManager implements LibraryManager, AutoCloseabl
 		synchronized (libraryAdapters) {
 			return libraryAdapters.containsKey(type);
 		}
+	}
+
+	@Override
+	public void registerLibraryTransformer(@NotNull LibraryTransformer transformer) {
+		transformationCoordinator.register(transformer);
+	}
+
+	@Override
+	public void unregisterLibraryTransformer(@NotNull String id) {
+		transformationCoordinator.unregister(id);
+	}
+
+	@Override
+	public boolean hasLibraryTransformer(@NotNull String id) {
+		return transformationCoordinator.isRegistered(id);
+	}
+
+	@Override
+	@NotNull
+	public List<LibraryTransformer> getLibraryTransformers() {
+		return transformationCoordinator.getTransformers();
 	}
 
 	@Override
@@ -621,14 +645,11 @@ public abstract class BaseLibraryManager implements LibraryManager, AutoCloseabl
 		LibraryRequest normalizedLibrary = LibraryHelper.normalize(adaptedLibrary);
 		Path file = artifactDownloadCoordinator.download(normalizedLibrary);
 
-		if (!normalizedLibrary.hasRelocations())
-			return file;
-
 		String relocatedPath = LibraryHelper.getRelocatedPath(normalizedLibrary);
-		if (relocatedPath == null)
-			return file;
+		if (relocatedPath != null)
+			file = relocate(file, relocatedPath, normalizedLibrary.getRelocations());
 
-		return relocate(file, relocatedPath, normalizedLibrary.getRelocations());
+		return transformationCoordinator.transform(normalizedLibrary, file);
 	}
 
 	/**
